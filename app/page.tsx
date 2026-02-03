@@ -3,6 +3,19 @@ import { useEffect, useMemo, useState } from "react";
 
 type Num = { number: number; status: string };
 
+const safari = {
+  bg: "#F5F1E8", // bege safari
+  card: "#FFFFFF",
+  green: "#4F6F52", // verde oliva
+  greenLight: "#E6EFE7",
+  brown: "#8B5E3C",
+  accent: "#DDB892", // areia
+  text: "#111827",
+  muted: "#6B7280",
+  warning: "#F59E0B",
+  paid: "#22C55E",
+};
+
 function diaperSize(n: number) {
   if (n >= 1 && n <= 30) return "P";
   if (n >= 31 && n <= 70) return "M";
@@ -10,122 +23,194 @@ function diaperSize(n: number) {
   return "-";
 }
 
+function statusLabel(status: string) {
+  if (status === "available") return "Disponível";
+  if (status === "paid") return "Pago ✅";
+  return "Reservado ⏳";
+}
+
 export default function Home() {
   const [numbers, setNumbers] = useState<Num[] | null>(null);
+
+  const [selected, setSelected] = useState<number | null>(null);
+  const [paymentType, setPaymentType] = useState<"pix" | "fralda">("pix");
+
   const [name, setName] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
-  const [selected, setSelected] = useState<number | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  const selectedSize = useMemo(() => {
-    return selected ? diaperSize(selected) : null;
-  }, [selected]);
+  const selectedSize = useMemo(() => (selected ? diaperSize(selected) : null), [selected]);
 
   async function load() {
-    const r = await fetch("/api/numbers");
-    const j = await r.json();
-    setNumbers(j.numbers || []);
+    try {
+      const r = await fetch("/api/numbers", { cache: "no-store" });
+      const j = await r.json();
+      setNumbers(j.numbers || []);
+    } catch (e) {
+      setNumbers([]);
+      setMsg("Erro ao carregar os números. Tente atualizar a página.");
+    }
   }
 
   useEffect(() => {
     load();
   }, []);
 
+  function resetFormAfterSuccess() {
+    setSelected(null);
+    setPaymentType("pix");
+    setName("");
+    setWhatsapp("");
+  }
+
   async function claim() {
     if (!selected) return;
+    if (!name.trim() || !whatsapp.trim()) {
+      setMsg("Preencha Nome e WhatsApp.");
+      return;
+    }
+
     setLoading(true);
     setMsg("");
 
-    const r = await fetch("/api/claim", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        number: selected,
-        name,
-        whatsapp,
-        paymentType: "pix", // pode continuar pix (a pessoa pode optar por fralda ou pix)
-      }),
-    });
+    try {
+      const r = await fetch("/api/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          number: selected,
+          name: name.trim(),
+          whatsapp: whatsapp.trim(),
+          paymentType, // "pix" ou "fralda"
+        }),
+      });
 
-    const j = await r.json();
-    setLoading(false);
+      const j = await r.json();
 
-    if (j?.ok) {
-      setMsg("Número reservado! ✅");
-      setSelected(null);
-      setName("");
-      setWhatsapp("");
-      load();
-    } else {
-      setMsg(j?.message || "Erro ao reservar.");
+      if (j?.ok) {
+        setMsg("Número reservado com sucesso! ✅");
+        resetFormAfterSuccess();
+        await load();
+      } else {
+        setMsg(j?.message || "Não foi possível reservar. Tente outro número.");
+      }
+    } catch (e) {
+      setMsg("Falha na reserva. Verifique sua internet e tente novamente.");
+    } finally {
+      setLoading(false);
     }
   }
 
-  if (!numbers) return <div style={{ padding: 20 }}>Carregando…</div>;
+  if (!numbers) {
+    return (
+      <div style={{ padding: 20, background: safari.bg, minHeight: "100vh", color: safari.text }}>
+        Carregando…
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1 style={{ marginBottom: 6 }}>Chá Rifa do Bebê Miguel Gabriel</h1>
-
+    <div style={{ padding: 20, background: safari.bg, minHeight: "100vh", color: safari.text }}>
+      {/* CAPA SAFARI */}
       <div
         style={{
-          padding: 12,
-          borderRadius: 10,
-          background: "#f3f4f6",
-          marginBottom: 14,
-          lineHeight: 1.4,
+          borderRadius: 16,
+          overflow: "hidden",
+          border: `2px solid ${safari.accent}`,
+          background: safari.card,
+          marginBottom: 16,
         }}
       >
-        <strong>Como funciona</strong>
-        <div>• Escolha um número e reserve online.</div>
-        <div>• Contribuição: <strong>R$ 45</strong>.</div>
-        <div>• Você pode optar por: <strong>1 pacote de fralda</strong> (conforme tabela) <strong>ou Pix</strong> no mesmo valor.</div>
+        <img
+          src="/capa-safari.png"
+          alt="Capa safari"
+          style={{ width: "100%", height: 220, objectFit: "cover", display: "block" }}
+        />
+      </div>
 
-        <div style={{ marginTop: 10 }}>
-          <strong>Tabela de Fraldas</strong>
+      {/* TÍTULO */}
+      <h1 style={{ marginBottom: 6, color: safari.green }}>
+        🦒 Chá Rifa do Bebê Miguel Gabriel 🦁
+      </h1>
+      <p style={{ color: safari.muted, marginTop: 0, marginBottom: 14 }}>
+        Escolha seu número e participe com <strong>Pix</strong> ou <strong>fralda</strong> 💚
+      </p>
+
+      {/* COMO FUNCIONA */}
+      <div
+        style={{
+          padding: 16,
+          borderRadius: 14,
+          background: safari.card,
+          marginBottom: 18,
+          border: `2px solid ${safari.accent}`,
+          lineHeight: 1.5,
+        }}
+      >
+        <div style={{ fontWeight: 800, color: safari.brown, marginBottom: 8 }}>Como funciona</div>
+
+        <div>• Contribuição: <strong>R$ 45</strong></div>
+        <div>• Você pode optar por: <strong>Pix</strong> ou <strong>1 pacote de fralda</strong> (conforme tabela)</div>
+
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${safari.greenLight}` }}>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Tabela de Fraldas</div>
           <div>• 1 a 30 → Fralda <strong>P</strong></div>
           <div>• 31 a 70 → Fralda <strong>M</strong></div>
           <div>• 71 a 100 → Fralda <strong>G</strong></div>
         </div>
+
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${safari.greenLight}` }}>
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>Legenda</div>
+          <div>• <span style={{ fontWeight: 700 }}>Verde claro</span>: disponível</div>
+          <div>• <span style={{ fontWeight: 700 }}>Bege</span>: reservado</div>
+          <div>• <span style={{ fontWeight: 700 }}>Verde</span>: pago</div>
+        </div>
       </div>
 
-      <div style={{ marginBottom: 10 }}>
-        <strong>Selecione um número abaixo:</strong>
-      </div>
+      {/* GRADE DE NÚMEROS */}
+      <div style={{ marginBottom: 10, fontWeight: 700 }}>Selecione um número:</div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 6 }}>
         {numbers.map((n) => {
           const isAvailable = n.status === "available";
           const isPaid = n.status === "paid";
 
+          const bg =
+            selected === n.number
+              ? safari.green
+              : isAvailable
+              ? safari.greenLight
+              : isPaid
+              ? safari.paid
+              : safari.accent;
+
+          const color = selected === n.number ? "white" : safari.text;
+
           return (
             <button
               key={n.number}
               disabled={!isAvailable}
-              onClick={() => setSelected(n.number)}
-              style={{
-                padding: 8,
-                border: "none",
-                borderRadius: 6,
-                cursor: isAvailable ? "pointer" : "not-allowed",
-                background:
-                  selected === n.number
-                    ? "#4ade80"
-                    : isAvailable
-                    ? "#e5e7eb"
-                    : isPaid
-                    ? "#22c55e"
-                    : "#f59e0b",
-                fontWeight: selected === n.number ? 700 : 500,
+              onClick={() => {
+                setSelected(n.number);
+                setPaymentType("pix"); // padrão
+                setMsg("");
               }}
               title={
                 isAvailable
                   ? `Disponível • Fralda ${diaperSize(n.number)}`
-                  : isPaid
-                  ? "Pago ✅"
-                  : "Reservado ⏳"
+                  : `${statusLabel(n.status)}`
               }
+              style={{
+                padding: 10,
+                border: `1px solid rgba(0,0,0,0.08)`,
+                borderRadius: 10,
+                cursor: isAvailable ? "pointer" : "not-allowed",
+                background: bg,
+                color,
+                fontWeight: selected === n.number ? 800 : 600,
+              }}
             >
               {n.number}
             </button>
@@ -133,67 +218,133 @@ export default function Home() {
         })}
       </div>
 
-      {/* Área do número selecionado */}
-      <div style={{ marginTop: 16, padding: 12, borderRadius: 10, background: "#fff7ed" }}>
-        {selected ? (
+      {/* CARTÃO DE RESERVA */}
+      <div
+        style={{
+          marginTop: 18,
+          padding: 16,
+          borderRadius: 14,
+          background: safari.card,
+          border: `2px dashed ${safari.green}`,
+        }}
+      >
+        {!selected ? (
+          <div style={{ color: safari.muted }}>
+            Clique em um número disponível para ver o tamanho da fralda e reservar.
+          </div>
+        ) : (
           <>
-            <div style={{ marginBottom: 6 }}>
+            <div style={{ marginBottom: 8 }}>
               Você escolheu o número <strong>{selected}</strong>
             </div>
-            <div style={{ marginBottom: 10 }}>
+
+            <div style={{ marginBottom: 12 }}>
               📦 Tamanho da fralda: <strong>{selectedSize}</strong>{" "}
-              <span style={{ opacity: 0.8 }}>(ou Pix R$ 45)</span>
+              <span style={{ color: safari.muted }}>(ou Pix R$ 45)</span>
             </div>
 
+            {/* Pix ou Fralda */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 800, marginBottom: 6, color: safari.brown }}>
+                Como você vai contribuir?
+              </div>
+
+              <label style={{ marginRight: 14 }}>
+                <input
+                  type="radio"
+                  name="paytype"
+                  value="pix"
+                  checked={paymentType === "pix"}
+                  onChange={() => setPaymentType("pix")}
+                />{" "}
+                Pix (R$ 45)
+              </label>
+
+              <label>
+                <input
+                  type="radio"
+                  name="paytype"
+                  value="fralda"
+                  checked={paymentType === "fralda"}
+                  onChange={() => setPaymentType("fralda")}
+                />{" "}
+                Fralda (tamanho {selectedSize})
+              </label>
+            </div>
+
+            {/* Dados */}
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <input
                 placeholder="Nome"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                style={{ padding: 10, borderRadius: 8, border: "1px solid #d1d5db" }}
+                style={{
+                  padding: 10,
+                  borderRadius: 10,
+                  border: "1px solid #d1d5db",
+                  minWidth: 220,
+                }}
               />
+
               <input
                 placeholder="WhatsApp"
                 value={whatsapp}
                 onChange={(e) => setWhatsapp(e.target.value)}
-                style={{ padding: 10, borderRadius: 8, border: "1px solid #d1d5db" }}
+                style={{
+                  padding: 10,
+                  borderRadius: 10,
+                  border: "1px solid #d1d5db",
+                  minWidth: 220,
+                }}
               />
+
               <button
                 onClick={claim}
-                disabled={loading || !selected || !name.trim() || !whatsapp.trim()}
+                disabled={loading || !name.trim() || !whatsapp.trim()}
                 style={{
                   padding: "10px 14px",
-                  borderRadius: 8,
+                  borderRadius: 10,
                   border: "none",
-                  background: loading ? "#9ca3af" : "#111827",
+                  background: loading ? "#9ca3af" : safari.green,
                   color: "white",
                   cursor: loading ? "not-allowed" : "pointer",
-                  fontWeight: 600,
+                  fontWeight: 800,
                 }}
               >
                 {loading ? "Enviando..." : "Confirmar reserva"}
               </button>
 
               <button
-                onClick={() => setSelected(null)}
+                onClick={() => {
+                  setSelected(null);
+                  setMsg("");
+                }}
                 style={{
                   padding: "10px 14px",
-                  borderRadius: 8,
-                  border: "1px solid #d1d5db",
+                  borderRadius: 10,
+                  border: `1px solid #d1d5db`,
                   background: "white",
                   cursor: "pointer",
+                  fontWeight: 700,
                 }}
               >
                 Cancelar
               </button>
             </div>
           </>
-        ) : (
-          <div>Selecione um número para ver o tamanho da fralda e reservar.</div>
         )}
 
-        {msg && <p style={{ marginTop: 10, marginBottom: 0 }}>{msg}</p>}
+        {msg && (
+          <p style={{ marginTop: 12, marginBottom: 0, fontWeight: 700, color: safari.brown }}>
+            {msg}
+          </p>
+        )}
       </div>
+
+      {/* Rodapé */}
+      <p style={{ marginTop: 16, color: safari.muted, fontSize: 13 }}>
+        Dica: se a página não atualizar, feche e abra de novo. 😉
+      </p>
     </div>
   );
 }
